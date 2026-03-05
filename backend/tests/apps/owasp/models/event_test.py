@@ -1,5 +1,5 @@
 import math
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -192,18 +192,14 @@ class TestEventUpcomingEvents:
 
     def test_upcoming_events_filter_uses_gte_with_date(self):
         """Regression test for #4041: Filter must use start_date__gte with date(), not datetime."""
+        fixed_now = datetime(2026, 1, 15, 12, 0)
         with patch.object(Event, "objects") as mock_objects:
             mock_qs = Mock()
             mock_objects.filter.return_value.exclude.return_value.order_by.return_value = mock_qs
+            with patch("apps.owasp.models.event.timezone.now", return_value=fixed_now):
+                Event.upcoming_events()
 
-            Event.upcoming_events()
-
-            # Verify filter was called with start_date__gte and a date object (not datetime)
-            filter_call_kwargs = mock_objects.filter.call_args[1]
-            assert "start_date__gte" in filter_call_kwargs
-            # The filter should receive a date object to include today's events
-            filter_value = filter_call_kwargs["start_date__gte"]
-            assert hasattr(filter_value, "year") and hasattr(filter_value, "month") and hasattr(filter_value, "day")
+            mock_objects.filter.assert_called_once_with(start_date__gte=fixed_now.date())
 
 
 class TestEventUpdateData:
